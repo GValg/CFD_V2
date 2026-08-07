@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>CFD Desk — Contract Calculator</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png" sizes="192x192">
+<meta name="theme-color" content="#0A0D12">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+:root{
+  --bg:#0A0D12;
+  --panel:#10141C;
+  --panel2:#161B26;
+  --border:#232938;
+  --text:#E6E9EF;
+  --muted:#78808F;
+  --cyan:#4FD8C4;
+  --amber:#E8A855;
+  --green:#3FBF7F;
+  --red:#E5555F;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;-webkit-tap-highlight-color:transparent;}
+body{padding:16px;max-width:640px;margin:0 auto;padding-bottom:48px;}
+
+.eyebrow{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;}
+h1{font-size:20px;font-weight:700;margin:2px 0 2px;letter-spacing:-.01em;}
+.subhead{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);margin-bottom:18px;}
+
+.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;}
+.card-title{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--cyan);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;}
+.card-title .tag{color:var(--muted);text-transform:none;letter-spacing:0;font-size:11px;}
+
+select,input{
+  width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);
+  font-family:'JetBrains Mono',monospace;font-size:14px;padding:9px 10px;border-radius:7px;
+  -webkit-appearance:none;appearance:none;
+}
+select:focus,input:focus{outline:2px solid var(--cyan);outline-offset:-1px;border-color:var(--cyan);}
+
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;}
+.field label{display:block;font-size:11px;color:var(--muted);margin-bottom:5px;font-family:'JetBrains Mono',monospace;}
+.field{margin-bottom:10px;}
+
+.dir-toggle{display:flex;border:1px solid var(--border);border-radius:7px;overflow:hidden;}
+.dir-toggle button{flex:1;padding:9px 0;background:var(--panel2);color:var(--muted);border:none;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;letter-spacing:.05em;}
+.dir-toggle button.active-long{background:rgba(63,191,127,.15);color:var(--green);}
+.dir-toggle button.active-short{background:rgba(229,85,95,.15);color:var(--red);}
+
+.spec-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;}
+.spec-item{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px dashed var(--border);padding-bottom:4px;}
+.spec-item .k{font-size:11px;color:var(--muted);}
+.spec-item .v{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;transition:opacity .18s ease;}
+.spec-item.editable{grid-column:1/-1;display:block;border-bottom:none;padding-bottom:0;}
+.spec-item.editable label{font-size:11px;color:var(--muted);display:block;margin-bottom:4px;}
+
+.output-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.out{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;}
+.out .k{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;}
+.out .v{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;}
+.out.wide{grid-column:1/-1;}
+.out.warn .v{color:var(--amber);}
+.out.risk .v{color:var(--red);}
+.out.good .v{color:var(--cyan);}
+
+.disclaimer{font-size:11px;color:var(--muted);line-height:1.5;padding:12px 4px 0;}
+.disclaimer b{color:var(--text);}
+
+.flag{font-size:10px;font-family:'JetBrains Mono',monospace;background:rgba(232,168,85,.12);color:var(--amber);padding:2px 6px;border-radius:4px;letter-spacing:.04em;}
+</style>
+</head>
+<body>
+
+<div class="eyebrow">EEA / MiCA — RETAIL LEVERAGE CAPS APPLIED</div>
+<h1>CFD Desk</h1>
+<div class="subhead">Name the contract → specs auto-fill → adjust trade inputs</div>
+
+<div class="card">
+  <div class="card-title">Instrument</div>
+  <select id="instrument"></select>
+</div>
+
+<div class="card">
+  <div class="card-title">Contract spec <span class="tag" id="specTag"></span></div>
+  <div class="spec-grid" id="specGrid"></div>
+</div>
+
+<div class="card">
+  <div class="card-title">Trade inputs</div>
+  <div class="field">
+    <label>Direction</label>
+    <div class="dir-toggle">
+      <button id="btnLong" onclick="setDir('long')">LONG</button>
+      <button id="btnShort" onclick="setDir('short')">SHORT</button>
+    </div>
+  </div>
+  <div class="row">
+    <div class="field"><label>Position size (units)</label><input id="units" type="number" value="10000" inputmode="decimal"></div>
+    <div class="field"><label>Entry price</label><input id="entry" type="number" value="" inputmode="decimal"></div>
+  </div>
+  <div class="row">
+    <div class="field"><label>Stop-loss price (optional)</label><input id="sl" type="number" value="" inputmode="decimal"></div>
+    <div class="field"><label>Holding period (days)</label><input id="days" type="number" value="1" inputmode="numeric"></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">Results</div>
+  <div class="output-grid" id="outputGrid"></div>
+</div>
+
+<div class="disclaimer">
+  <b>Spec values are indicative defaults, not live broker data.</b> Spread, swap, and leverage cap fields are editable — overwrite with your actual OKX / Kraken / broker figures before sizing a real position. Liquidation estimate assumes equity fully depleted at required margin (ignores maintenance-margin buffer, so actual broker stop-out will occur earlier). This tool performs arithmetic only — it is not trade advice.
+</div>
+
+<script>
+// ---- Instrument spec table (indicative — user-editable) ----
+// leverage = max retail leverage under ESMA/MiCA product-intervention caps by category
+const INSTRUMENTS = {
+  fx: {
+    label: "FX Majors",
+    items: {
+      "EUR/USD": { point:0.0001, leverage:30, spread:0.00006, swapLong:-0.15, swapShort:0.02 },
+      "GBP/USD": { point:0.0001, leverage:30, spread:0.00009, swapLong:-0.18, swapShort:0.03 },
+      "USD/JPY": { point:0.01,   leverage:30, spread:0.008,   swapLong:0.20,  swapShort:-0.28 },
+      "USD/CHF": { point:0.0001, leverage:30, spread:0.00012, swapLong:0.05,  swapShort:-0.12 },
+      "AUD/USD": { point:0.0001, leverage:30, spread:0.00008, swapLong:-0.05, swapShort:-0.02 },
+      "USD/CAD": { point:0.0001, leverage:30, spread:0.00012, swapLong:0.02,  swapShort:-0.10 },
+      "NZD/USD": { point:0.0001, leverage:30, spread:0.00010, swapLong:-0.06, swapShort:-0.01 }
+    }
+  },
+  metals: {
+    label: "Metals",
+    items: {
+      "XAU/USD": { point:0.01, leverage:20, spread:0.30, swapLong:-3.50, swapShort:1.20 }
+    }
+  },
+  indices: {
+    label: "Indices",
+    items: {
+      "US500":  { point:1, leverage:20, spread:0.6, swapLong:-0.80, swapShort:0.30 },
+      "US30":   { point:1, leverage:20, spread:2.0, swapLong:-2.20, swapShort:0.90 },
+      "NAS100": { point:1, leverage:20, spread:1.5, swapLong:-1.60, swapShort:0.60 },
+      "GER40":  { point:1, leverage:20, spread:1.0, swapLong:-0.70, swapShort:0.25 },
+      "UK100":  { point:1, leverage:20, spread:1.0, swapLong:-0.60, swapShort:0.20 }
+    }
+  },
+  crypto: {
+    label: "Crypto CFDs",
+    items: {
+      "BTC/USD": { point:1,    leverage:2, spread:15,    swapLong:-4.00, swapShort:1.50 },
+      "ETH/USD": { point:1,    leverage:2, spread:1.0,   swapLong:-0.30, swapShort:0.10 },
+      "SOL/USD": { point:0.01, leverage:2, spread:0.02,  swapLong:-0.02, swapShort:0.005 },
+      "XRP/USD": { point:0.0001, leverage:2, spread:0.0006, swapLong:-0.0002, swapShort:0.00005 }
+    }
+  }
+};
+
+const DEFAULT_PRICE = {
+  "EUR/USD":1.0850,"GBP/USD":1.2650,"USD/JPY":151.20,"USD/CHF":0.8850,"AUD/USD":0.6550,
+  "USD/CAD":1.3650,"NZD/USD":0.6050,"XAU/USD":2400,"US500":5450,"US30":39800,"NAS100":19200,
+  "GER40":18500,"UK100":8150,"BTC/USD":62000,"ETH/USD":3400,"SOL/USD":145,"XRP/USD":0.52
+};
+
+let direction = "long";
+const $ = id => document.getElementById(id);
+
+function buildSelect(){
+  const sel = $("instrument");
+  Object.entries(INSTRUMENTS).forEach(([key, grp])=>{
+    const og = document.createElement("optgroup");
+    og.label = grp.label;
+    Object.keys(grp.items).forEach(sym=>{
+      const opt = document.createElement("option");
+      opt.value = sym; opt.textContent = sym;
+      og.appendChild(opt);
+    });
+    sel.appendChild(og);
+  });
+  sel.value = "EUR/USD";
+}
+
+function findSpec(sym){
+  for(const grp of Object.values(INSTRUMENTS)){
+    if(grp.items[sym]) return {category:grp.label, ...grp.items[sym]};
+  }
+}
+
+function renderSpecEditor(sym){
+  const spec = findSpec(sym);
+  $("specTag").textContent = spec.category;
+  $("entry").value = DEFAULT_PRICE[sym] ?? "";
+  $("specGrid").innerHTML = `
+    <div class="spec-item editable"><label>Point size</label><input id="pt_point" type="number" value="${spec.point}" step="any"></div>
+    <div class="spec-item editable"><label>Max leverage (ESMA/MiCA cap) — ratio, e.g. 30 = 30:1</label><input id="pt_lev" type="number" value="${spec.leverage}"></div>
+    <div class="spec-item editable"><label>Typical spread (price units)</label><input id="pt_spread" type="number" value="${spec.spread}" step="any"></div>
+    <div class="row" style="margin-top:2px;">
+      <div class="spec-item editable"><label>Swap / day — long (per unit)</label><input id="pt_swapL" type="number" value="${spec.swapLong}" step="any"></div>
+      <div class="spec-item editable"><label>Swap / day — short (per unit)</label><input id="pt_swapS" type="number" value="${spec.swapShort}" step="any"></div>
+    </div>
+  `;
+  ["pt_point","pt_lev","pt_spread","pt_swapL","pt_swapS"].forEach(id=>{
+    $(id).addEventListener("input", calc);
+  });
+}
+
+function setDir(d){
+  direction = d;
+  $("btnLong").className = d==="long" ? "active-long" : "";
+  $("btnShort").className = d==="short" ? "active-short" : "";
+  calc();
+}
+
+function fmt(n, dp=2){
+  if(!isFinite(n)) return "—";
+  return n.toLocaleString(undefined,{minimumFractionDigits:dp, maximumFractionDigits:dp});
+}
+
+function calc(){
+  const units = parseFloat($("units").value) || 0;
+  const entry = parseFloat($("entry").value) || 0;
+  const sl = parseFloat($("sl").value);
+  const days = parseFloat($("days").value) || 0;
+  const point = parseFloat($("pt_point").value) || 0;
+  const lev = parseFloat($("pt_lev").value) || 1;
+  const spread = parseFloat($("pt_spread").value) || 0;
+  const swapL = parseFloat($("pt_swapL").value) || 0;
+  const swapS = parseFloat($("pt_swapS").value) || 0;
+
+  const notional = units * entry;
+  const margin = notional / lev;
+  const pointValue = units * point;
+  const spreadCost = units * spread;
+  const swapRate = direction === "long" ? swapL : swapS;
+  const swapCost = units * swapRate * days;
+
+  let riskAmount = null;
+  if(sl && entry){
+    riskAmount = units * Math.abs(entry - sl);
+  }
+
+  // simplified worst-case liquidation: price move where margin is fully depleted
+  const moveToWipe = units !== 0 ? margin / units : 0;
+  const liqPrice = direction === "long" ? entry - moveToWipe : entry + moveToWipe;
+
+  $("outputGrid").innerHTML = `
+    <div class="out"><div class="k">Notional value</div><div class="v">$${fmt(notional)}</div></div>
+    <div class="out good"><div class="k">Required margin</div><div class="v">$${fmt(margin)}</div></div>
+    <div class="out"><div class="k">Point value</div><div class="v">$${fmt(pointValue,4)}</div></div>
+    <div class="out"><div class="k">Spread cost</div><div class="v">$${fmt(spreadCost)}</div></div>
+    <div class="out ${swapCost<0?'risk':'good'}"><div class="k">Swap, ${fmt(days,0)}d (${direction})</div><div class="v">$${fmt(swapCost)}</div></div>
+    <div class="out ${riskAmount!==null?'risk':''}"><div class="k">Risk if SL hit</div><div class="v">${riskAmount!==null ? '$'+fmt(riskAmount) : '—'}</div></div>
+    <div class="out warn wide"><div class="k">Est. liquidation price (worst-case, no maint. buffer)</div><div class="v">${fmt(liqPrice,5)}</div></div>
+  `;
+}
+
+$("instrument").addEventListener("change", e=>{
+  renderSpecEditor(e.target.value);
+  calc();
+});
+["units","entry","sl","days"].forEach(id=> $(id).addEventListener("input", calc));
+
+buildSelect();
+renderSpecEditor("EUR/USD");
+setDir("long");
+</script>
+</body>
+</html>
